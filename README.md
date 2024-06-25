@@ -1,3 +1,4 @@
+# Coming Soon to Open Source: HybridEditDif
 # HybridEditDif: Text and Exemplar Guided Object Inpainting with Diffusion Models
 ![Image description](https://github.com/LQQME/Figure/blob/main/figure/HybridEditDif/git1.png)
 
