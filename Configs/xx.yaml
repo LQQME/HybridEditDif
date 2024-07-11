@@ -1,0 +1,135 @@
+class ModelConfig:
+    def __init__(self):
+        self.base_learning_rate = 1.0e-05
+        self.target = "ldm.models.diffusion.ddpm.LatentDiffusion"
+        self.params = self.setup_params()
+
+    def setup_params(self):
+        return {
+            "linear_start": 0.00085,
+            "linear_end": 0.0120,
+            "num_timesteps_cond": 1,
+            "log_every_t": 200,
+            "timesteps": 1000,
+            "first_stage_key": "inpaint",
+            "cond_stage_key": "image",
+            "image_size": 64,
+            "channels": 4,
+            "cond_stage_trainable": True,
+            "conditioning_key": "crossattn",
+            "monitor": "val/loss_simple_ema",
+            "u_cond_percent": 0.2,
+            "scale_factor": 0.18215,
+            "use_ema": False,
+            "scheduler_config": self.setup_scheduler_config(),
+            "unet_config": self.setup_unet_config(),
+            "first_stage_config": self.setup_first_stage_config(),
+            "cond_stage_config": self.setup_cond_stage_config()
+        }
+
+    def setup_scheduler_config(self):
+        return {
+            "target": "ldm.lr_scheduler.LambdaLinearScheduler",
+            "params": {
+                "warm_up_steps": [10000],
+                "cycle_lengths": [10000000000000],
+                "f_start": [1.e-6],
+                "f_max": [1.],
+                "f_min": [1.]
+            }
+        }
+
+    def setup_unet_config(self):
+        return {
+            "target": "ldm.modules.diffusionmodules.openaimodel.UNetModel",
+            "params": {
+                "image_size": 32,
+                "in_channels": 9,
+                "out_channels": 4,
+                "model_channels": 320,
+                "attention_resolutions": [4, 2, 1],
+                "num_res_blocks": 2,
+                "channel_mult": [1, 2, 4, 4],
+                "num_heads": 8,
+                "use_spatial_transformer": True,
+                "transformer_depth": 1,
+                "context_dim": 768,
+                "use_checkpoint": True,
+                "legacy": False,
+                "add_conv_in_front_of_unet": False
+            }
+        }
+
+    def setup_first_stage_config(self):
+        return {
+            "target": "ldm.models.autoencoder.AutoencoderKL",
+            "params": {
+                "embed_dim": 4,
+                "monitor": "val/rec_loss",
+                "ddconfig": {
+                    "double_z": True,
+                    "z_channels": 4,
+                    "resolution": 256,
+                    "in_channels": 3,
+                    "out_ch": 3,
+                    "ch": 128,
+                    "ch_mult": [1, 2, 4, 4],
+                    "num_res_blocks": 2,
+                    "attn_resolutions": [],
+                    "dropout": 0.0
+                },
+                "lossconfig": {
+                    "target": "torch.nn.Identity"
+                }
+            }
+        }
+
+    def setup_cond_stage_config(self):
+        return {
+            "target": "ldm.modules.encoders.modules.FrozenCLIPImageEmbedder"
+        }
+
+
+class DataConfig:
+    def __init__(self):
+        self.target = "main.DataModuleFromConfig"
+        self.params = self.setup_params()
+
+    def setup_params(self):
+        common_params = {
+            "arbitrary_mask_percent": 0.5,
+            "image_size": 512
+        }
+        return {
+            "batch_size": 4,
+            "wrap": False,
+            "train": self.setup_dataset_config("train"),
+            "validation": self.setup_dataset_config("validation"),
+            "test": self.setup_dataset_config("test")
+        }
+
+    def setup_dataset_config(self, state):
+        return {
+            "target": "ldm.data.open-images.OpenImageDataset",
+            "params": {
+                "state": state,
+                "dataset_dir": f"dataset/open-images",
+                **self.common_params
+            }
+        }
+
+
+class LightningConfig:
+    def __init__(self):
+        self.trainer = {
+            "max_epochs": 40,
+            "num_nodes": 1,
+            "accelerator": 'gpu',
+            "gpus": "0,1,2,3,4,5,6,7"
+        }
+
+
+# Instantiate configurations
+model_config = ModelConfig()
+data_config = DataConfig()
+lightning_config = LightningConfig()
